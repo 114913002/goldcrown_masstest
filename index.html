@@ -57,6 +57,11 @@
   }
   .bubble h1{margin:0 0 4px;font-size:1.05rem;color:var(--terra)}
   .bubble h2{margin:0 0 16px;font-size:1.45rem;line-height:1.4}
+  .student-fields{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 0 16px}
+  .student-fields label{display:grid;gap:4px;font-size:.95rem;font-weight:700}
+  .student-fields label:last-child{grid-column:1/-1}
+  .student-fields input{width:100%;min-width:0;padding:7px 9px;border:2px solid var(--ink);border-radius:8px;background:#fffdf5;color:var(--ink);font:inherit}
+  @media(max-width:480px){.student-fields{grid-template-columns:1fr}.student-fields label:last-child{grid-column:auto}}
   .choices{display:flex;flex-direction:column;gap:12px}
   .choices .btn{text-align:left;font-size:1.25rem}
   @media(max-width:760px){
@@ -159,12 +164,33 @@
   .ans-row.ok input{background:#e3f3d3}
   .ans-row.bad input{background:#fbdcd2}
   #feedback{min-height:1.6em;font-weight:700;text-align:center;margin-top:8px;line-height:1.5}
+  .results-wrap{margin-top:18px;overflow-x:auto}
+  .results-wrap h3{margin:0 0 8px;font-size:1.05rem}
+  .results-table{width:100%;border-collapse:collapse;background:#fffdf5;font-size:.95rem}
+  .results-table th,.results-table td{padding:7px 9px;border:1px solid var(--ink);text-align:left}
+  .results-table th{background:#ead8ad}
+  .results-table td:nth-child(2),.results-table td:nth-child(3){text-align:center}
+  #attemptSummary{margin:10px 0;font-weight:700}
+  #printReport{display:none}
 
   #toast{
     position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:#fff;
     padding:8px 18px;border-radius:20px;z-index:400;opacity:0;pointer-events:none;transition:opacity .25s;font-size:.95rem;
   }
   #toast.show{opacity:1}
+  @media print{
+    @page{margin:16mm}
+    body{background:#fff;color:#111;font-family:Arial,"Noto Serif TC",serif}
+    body *{visibility:hidden!important}
+    #modalAnswer{position:static;display:block!important;background:none;padding:0}
+    #modalAnswer .dialog{max-width:none;width:auto;max-height:none;overflow:visible;padding:0;border:0;border-radius:0;box-shadow:none;background:#fff;animation:none}
+    #modalAnswer .dialog>*:not(#printReport){display:none!important}
+    #printReport,#printReport *{visibility:visible!important}
+    #printReport{display:block!important;position:static}
+    #printReport h2{margin:0 0 12px}
+    #printReport .results-table{font-size:11pt}
+    #printReport .results-table th{background:#eee!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  }
 </style>
 </head>
 <body>
@@ -275,6 +301,17 @@
     <div class="bubble">
       <h1>👴 阿基米德說：</h1>
       <h2>可以選用哪種工具，測量皇冠的質量呢？</h2>
+      <div class="student-fields" aria-label="學生資料">
+        <label for="studentClass">班級
+          <input id="studentClass" type="text" autocomplete="off" placeholder="例如：五年一班">
+        </label>
+        <label for="studentNumber">座號
+          <input id="studentNumber" type="text" inputmode="numeric" autocomplete="off" placeholder="例如：08">
+        </label>
+        <label for="studentName">姓名
+          <input id="studentName" type="text" autocomplete="name" placeholder="請輸入姓名">
+        </label>
+      </div>
       <div class="choices">
         <button class="btn" data-tool="balance">⚖️ 上皿天平</button>
         <button class="btn" data-tool="spring">🌀 彈簧</button>
@@ -372,12 +409,31 @@
  <p>根據你用天平測量的結果，請填寫皇冠 A～E 和金塊的質量各是多少公克？</p>
     <form id="ansForm" autocomplete="off" novalidate>
       <div id="ansRows"></div>
+      <section class="results-wrap" aria-labelledby="resultsHeading">
+        <h3 id="resultsHeading">質量結果紀錄表</h3>
+        <table class="results-table">
+          <thead><tr><th scope="col">測量物品</th><th scope="col">填入質量</th><th scope="col">嘗試次數</th><th scope="col">結果</th></tr></thead>
+          <tbody id="resultsTableBody"></tbody>
+        </table>
+        <p id="attemptSummary"></p>
+      </section>
       <div id="feedback"></div>
       <div class="row-btn">
         <button type="submit" class="btn" style="background:var(--gold)">送出答案</button>
         <button type="button" class="btn" id="ansBack">回去繼續測量</button>
       </div>
     </form>
+    <div class="row-btn"><button type="button" class="btn big" id="exportPdf" hidden>匯出 PDF</button></div>
+    <section id="printReport">
+      <h2>阿基米德的皇冠質量測量｜實驗結果</h2>
+      <p id="printStudentInfo"></p>
+      <p id="printToolAttempts"></p>
+      <table class="results-table">
+        <thead><tr><th scope="col">測量物品</th><th scope="col">填入質量</th><th scope="col">嘗試次數</th><th scope="col">結果</th></tr></thead>
+        <tbody id="printResultsTableBody"></tbody>
+      </table>
+      <p>結果討論：五頂皇冠和金塊的質量都是 193.2 g。外形和材質不同，質量卻一樣。</p>
+    </section>
   </div>
 </div>
 
@@ -452,10 +508,15 @@
   const openModal  = id => $(id).classList.add('open');
   const closeModal = id => $(id).classList.remove('open');
 
+  let toolAttempts = 0;
+  let toolSelected = false;
   document.querySelectorAll('[data-tool]').forEach(b=>{
     b.addEventListener('click',()=>{
-      if(b.dataset.tool === 'balance') show('lab');
-      else openModal('#modalThink');
+      if(!toolSelected) toolAttempts++;
+      if(b.dataset.tool === 'balance'){
+        toolSelected = true;
+        show('lab');
+      } else openModal('#modalThink');
     });
   });
   $('#thinkOk').onclick = ()=>closeModal('#modalThink');
@@ -586,6 +647,9 @@
 
   /* ================== 結果討論 ================== */
   const answerItems = ITEMS;   // 皇冠 A～E ＋ 金塊，共 6 項
+  const massAttempts = {};
+  const massSolved = {};
+  answerItems.forEach(item=>{ massAttempts[item.id] = 0; massSolved[item.id] = false; });
 
   $('#ansRows').innerHTML = answerItems.map(c=>
     `<div class="ans-row" data-id="${c.id}">
@@ -595,23 +659,74 @@
        <span class="unit">g</span><span class="mark"></span>
      </div>`).join('');
 
-  $('#toResult').onclick = ()=>{ $('#feedback').textContent=''; openModal('#modalAnswer'); };
+  function renderResultsTable(){
+    const rows = answerItems.map(item=>{
+      const input = $('#in'+item.id);
+      const value = input.value.trim();
+      const row = document.createElement('tr');
+      [item.name, value ? value+' g' : '—', String(massAttempts[item.id]), massSolved[item.id] ? '成功' : massAttempts[item.id] ? '尚未成功' : '尚未嘗試'].forEach(text=>{
+        const cell = document.createElement('td');
+        cell.textContent = text;
+        row.appendChild(cell);
+      });
+      return row;
+    });
+    const body = $('#resultsTableBody');
+    body.innerHTML = '';
+    rows.forEach(row=>body.appendChild(row));
+    $('#attemptSummary').textContent = '選擇正確測量器具：'+toolAttempts+' 次';
+  }
+
+  function updatePrintReport(){
+    const studentClass = $('#studentClass').value.trim() || '未填寫';
+    const studentNumber = $('#studentNumber').value.trim() || '未填寫';
+    const studentName = $('#studentName').value.trim() || '未填寫';
+    $('#printStudentInfo').textContent = '班級：'+studentClass+'　座號：'+studentNumber+'　姓名：'+studentName;
+    $('#printToolAttempts').textContent = '選擇正確測量器具：'+toolAttempts+' 次';
+    const body = $('#printResultsTableBody');
+    body.innerHTML = '';
+    answerItems.forEach(item=>{
+      const input = $('#in'+item.id);
+      const row = document.createElement('tr');
+      [item.name, input.value.trim()+' g', String(massAttempts[item.id]), '成功'].forEach(text=>{
+        const cell = document.createElement('td');
+        cell.textContent = text;
+        row.appendChild(cell);
+      });
+      body.appendChild(row);
+    });
+  }
+
+  $('#ansRows').addEventListener('input', renderResultsTable);
+  $('#toResult').onclick = ()=>{ $('#feedback').textContent=''; renderResultsTable(); openModal('#modalAnswer'); };
   $('#ansBack').onclick  = ()=>closeModal('#modalAnswer');
+  $('#exportPdf').onclick = ()=>{ updatePrintReport(); window.print(); };
   $('#ansForm').addEventListener('submit', e=>{
     e.preventDefault();
-    let okCount = 0, empty = 0;
+    let empty = 0;
     document.querySelectorAll('.ans-row').forEach(row=>{
+      const id = row.dataset.id;
       const v = row.querySelector('input').value.trim();
       const mark = row.querySelector('.mark');
-      row.classList.remove('ok','bad'); mark.textContent = '';
+      row.classList.remove('ok','bad');
+      if(massSolved[id]){ row.classList.add('ok'); mark.textContent = '✔'; return; }
+      mark.textContent = '';
       if(v === ''){ empty++; return; }
-      if(Math.abs(parseFloat(v) - TARGET_MG/1000) < 0.05){ row.classList.add('ok'); mark.textContent = '✔'; okCount++; }
-      else { row.classList.add('bad'); mark.textContent = '✘'; }
+      massAttempts[id]++;
+      if(Math.abs(parseFloat(v) - TARGET_MG/1000) < 0.05){
+        massSolved[id] = true;
+        row.classList.add('ok');
+        mark.textContent = '✔';
+        row.querySelector('input').disabled = true;
+      } else { row.classList.add('bad'); mark.textContent = '✘'; }
     });
+    renderResultsTable();
     const fb = $('#feedback');
     if(empty){ fb.textContent = '還有 ' + empty + ' 項沒有填寫喔！'; }
-    else if(okCount === answerItems.length){
+    else if(answerItems.every(item=>massSolved[item.id])){
       fb.innerHTML = '🎉 太棒了！五頂皇冠和金塊的質量都是 <b>193.2 g</b>。<br>外形和材質不同，質量卻一樣喔！';
+      updatePrintReport();
+      $('#exportPdf').hidden = false;
     } else {
       fb.textContent = '有些答案還不太對，回到天平再測量一次看看吧！';
     }
@@ -625,7 +740,7 @@
   }
 
   /* 初始化 */
-  renderLeft(); renderRight(); render(); update();
+  renderLeft(); renderRight(); render(); update(); renderResultsTable();
 })();
 </script>
 </body>
