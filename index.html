@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>阿基米德的皇冠質量測量</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=LXGW+WenKai+TC:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#3b2a1a; --paper:#fbf1d6; --wood:#b9824a; --wood-d:#8b5a2b;
+    --blue:#2d6a8f; --terra:#c4572e; --olive:#6b7a3a; --gold:#f2c230;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;min-height:100%}
+  body{
+    font-family:"LXGW WenKai TC","Kaiti TC","BiauKai","DFKai-SB","標楷體","Noto Serif TC",cursive,serif;
+    color:var(--ink); background:#f1dfb8; font-size:18px;
+    -webkit-user-select:none; user-select:none; -webkit-touch-callout:none;
+  }
+  .bg{position:fixed;inset:0;width:100%;height:100%;z-index:-1}
+
+  /* ---------- 通用元件 ---------- */
+  .btn{
+    font-family:inherit; font-size:1.05rem; font-weight:700; color:var(--ink);
+    background:var(--paper); border:3px solid var(--ink);
+    border-radius:18px 6px 20px 8px / 8px 20px 6px 18px;
+    padding:10px 18px; cursor:pointer; box-shadow:3px 4px 0 var(--ink);
+    transition:transform .08s, box-shadow .08s, background .15s;
+  }
+  .btn:hover{background:#fff6dc}
+  .btn:active{transform:translate(2px,3px);box-shadow:1px 1px 0 var(--ink)}
+  .btn.big{font-size:1.3rem;padding:14px 30px;background:var(--gold)}
+  .btn.big:hover{background:#ffd54a}
+  .btn.small{font-size:.9rem;padding:6px 12px}
+
+  .screen{display:none;min-height:100vh}
+  .screen.active{display:flex}
+
+  /* ---------- 開場畫面 ---------- */
+  #intro{align-items:center;justify-content:center;padding:16px}
+  .intro-inner{display:flex;align-items:center;justify-content:center;gap:28px;flex-wrap:wrap;max-width:1000px}
+  .arch-big{width:min(340px,70vw);height:auto;filter:drop-shadow(4px 6px 0 rgba(59,42,26,.25))}
+  .bubble{
+    position:relative; background:var(--paper); border:4px solid var(--ink);
+    border-radius:28px 12px 30px 14px / 14px 30px 12px 28px;
+    padding:22px 26px; max-width:460px; box-shadow:5px 6px 0 var(--ink);
+  }
+  .bubble::before{
+    content:""; position:absolute; left:-26px; top:60px; width:0; height:0;
+    border:14px solid transparent; border-right:26px solid var(--ink);
+  }
+  .bubble::after{
+    content:""; position:absolute; left:-18px; top:64px; width:0; height:0;
+    border:10px solid transparent; border-right:20px solid var(--paper);
+  }
+  .bubble h1{margin:0 0 4px;font-size:1.05rem;color:var(--terra)}
+  .bubble h2{margin:0 0 16px;font-size:1.45rem;line-height:1.4}
+  .choices{display:flex;flex-direction:column;gap:12px}
+  .choices .btn{text-align:left;font-size:1.25rem}
+  @media(max-width:760px){
+    .bubble::before,.bubble::after{display:none}
+  }
+
+  /* ---------- 實驗畫面 ---------- */
+  #lab{justify-content:center;padding:12px}
+  .lab-wrap{width:100%;max-width:960px;display:flex;flex-direction:column;gap:12px}
+  .topbar{display:flex;align-items:center;gap:12px}
+  .hint{
+    flex:1;display:flex;align-items:center;gap:10px;
+    background:rgba(251,241,214,.9);border:3px solid var(--ink);
+    border-radius:16px 8px 18px 8px / 8px 18px 8px 16px;padding:6px 12px;font-size:.95rem;
+  }
+  .hint svg{width:52px;height:72px;flex:none}
+
+  .sign-wrap{position:relative;display:flex;justify-content:center;margin-top:26px}
+  .rope{position:absolute;top:-26px;width:3px;height:30px;background:var(--ink)}
+  .rope.l{left:calc(50% - 120px);transform:rotate(-12deg)}
+  .rope.r{left:calc(50% + 120px);transform:rotate(12deg)}
+  .sign{
+    min-width:min(480px,92%);text-align:center;padding:10px 24px 12px;
+    background:var(--wood);border:4px solid var(--ink);
+    border-radius:14px 6px 16px 8px / 8px 16px 6px 14px;
+    box-shadow:4px 5px 0 var(--ink);
+    background-image:repeating-linear-gradient(0deg,rgba(0,0,0,.05) 0 3px,transparent 3px 9px);
+    transition:background-color .25s;
+  }
+  .sign small{display:block;font-size:.85rem;color:#fff6dc;letter-spacing:.1em}
+  .sign strong{display:block;font-size:1.9rem;color:#fff;text-shadow:2px 2px 0 var(--ink)}
+  .sign.idle{background-color:#a89a80}
+  .sign.left{background-color:var(--terra)}
+  .sign.right{background-color:var(--blue)}
+  .sign.equal{background-color:var(--olive)}
+
+  .stage{
+    background:rgba(251,241,214,.55);border:3px dashed var(--ink);
+    border-radius:20px 10px 22px 10px / 10px 22px 10px 20px;padding:4px;
+  }
+  #bal{width:100%;height:auto;display:block;touch-action:none}
+  #bal text{font-family:inherit}
+  .pw{cursor:grab;touch-action:none}
+
+  .panels{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media(max-width:720px){.panels{grid-template-columns:1fr}}
+  .panel{
+    background:rgba(251,241,214,.92);border:3px solid var(--ink);
+    border-radius:18px 8px 20px 8px / 8px 20px 8px 18px;padding:10px 14px 14px;
+  }
+  .panel h3{margin:0 0 8px;font-size:1.05rem}
+  .items{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .item-btn{
+    font-family:inherit;color:var(--ink);background:#fff6dc;border:3px solid var(--ink);
+    border-radius:12px 6px 14px 6px / 6px 14px 6px 12px;padding:4px 2px 6px;cursor:pointer;
+    font-size:.95rem;font-weight:700;box-shadow:2px 3px 0 var(--ink);
+  }
+  .item-btn svg{width:70px;height:48px;display:block;margin:0 auto}
+  .item-btn.on{background:var(--gold);transform:translate(1px,2px);box-shadow:1px 1px 0 var(--ink)}
+
+  .tray{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;justify-items:center;margin-bottom:10px}
+  .wt{
+    position:relative;display:flex;align-items:center;justify-content:center;
+    width:78px;height:42px;border:3px solid var(--ink);border-radius:10px 6px 10px 6px;
+    font-weight:700;font-size:1rem;cursor:grab;touch-action:none;box-shadow:2px 3px 0 var(--ink);
+  }
+  .wt::before{
+    content:"";position:absolute;top:-10px;left:50%;width:22px;height:10px;margin-left:-11px;
+    background:inherit;border:3px solid var(--ink);border-bottom:none;border-radius:8px 8px 0 0;
+  }
+  .wt.ghost{position:fixed;z-index:200;pointer-events:none;transform:translate(-50%,-50%) scale(1.1);opacity:.92}
+  .tray-note{font-size:.85rem;color:#6b563d;margin:0 0 8px}
+  .bottom{display:flex;justify-content:center;padding:6px 0 24px}
+
+  /* ---------- 彈出視窗 ---------- */
+  .modal{
+    position:fixed;inset:0;z-index:300;display:none;align-items:center;justify-content:center;
+    background:rgba(59,42,26,.55);padding:16px;
+  }
+  .modal.open{display:flex}
+  .dialog{
+    background:var(--paper);border:4px solid var(--ink);max-width:520px;width:100%;
+    border-radius:24px 10px 26px 12px / 12px 26px 10px 24px;padding:24px;
+    box-shadow:6px 8px 0 var(--ink);max-height:92vh;overflow:auto;
+    animation:pop .18s ease-out;-webkit-user-select:text;user-select:text;
+  }
+  @keyframes pop{from{transform:scale(.85);opacity:0}to{transform:scale(1);opacity:1}}
+  .dialog h2{margin:0 0 10px;font-size:1.4rem}
+  .dialog p{margin:6px 0 16px;line-height:1.6}
+  .dialog .row-btn{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:8px}
+  .ans-row{display:flex;align-items:center;gap:10px;margin:10px 0}
+  .ans-row svg{width:62px;height:44px;flex:none}
+  .ans-row label{flex:none;width:6.2em;font-weight:700}
+  .ans-row input{
+    flex:1;min-width:0;font-family:inherit;font-size:1.15rem;padding:6px 10px;
+    border:3px solid var(--ink);border-radius:10px 5px 10px 5px;background:#fffdf5;color:var(--ink);
+  }
+  .ans-row .unit{flex:none}
+  .ans-row .mark{flex:none;width:1.6em;font-size:1.3rem;text-align:center}
+  .ans-row.ok input{background:#e3f3d3}
+  .ans-row.bad input{background:#fbdcd2}
+  #feedback{min-height:1.6em;font-weight:700;text-align:center;margin-top:8px;line-height:1.5}
+
+  #toast{
+    position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:#fff;
+    padding:8px 18px;border-radius:20px;z-index:400;opacity:0;pointer-events:none;transition:opacity .25s;font-size:.95rem;
+  }
+  #toast.show{opacity:1}
+</style>
+</head>
+<body>
+
+<!-- 共用的手繪濾鏡與阿基米德圖樣 -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <filter id="roughSoft" x="-5%" y="-5%" width="110%" height="110%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.035" numOctaves="2" seed="4" result="n"/>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="3.5" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+  </defs>
+
+  <symbol id="archimedes" viewBox="0 0 300 420">
+    <g filter="url(#roughSoft)" stroke="#3b2a1a" stroke-width="4" stroke-linejoin="round" stroke-linecap="round">
+      <!-- 長袍 -->
+      <path d="M90 205 Q58 245 52 410 L248 410 Q242 245 210 205 Q150 238 90 205 Z" fill="#f7efd9"/>
+      <path d="M100 215 Q170 300 238 332" fill="none" stroke-width="3"/>
+      <path d="M130 250 Q135 330 128 408 M175 280 Q185 340 190 408" fill="none" stroke-width="2.5"/>
+      <path d="M85 215 Q150 245 215 215" fill="#e8d9b0"/>
+      <!-- 左手拿卷軸 -->
+      <path d="M98 215 Q58 250 80 325 L112 314 Q96 272 124 238 Z" fill="#f7efd9"/>
+      <g transform="rotate(-18 95 335)">
+        <rect x="50" y="320" width="92" height="28" rx="13" fill="#fff6dc"/>
+        <ellipse cx="52" cy="334" rx="8" ry="14" fill="#f0dfae"/>
+        <ellipse cx="140" cy="334" rx="8" ry="14" fill="#f0dfae"/>
+        <path d="M68 328 H122 M68 336 H116 M68 343 H124" stroke-width="2" fill="none"/>
+      </g>
+      <circle cx="106" cy="318" r="11" fill="#f6d5ae"/>
+      <!-- 右手比出「我想到了！」 -->
+      <path d="M202 208 Q248 214 266 168 L240 158 Q228 190 196 190 Z" fill="#f7efd9"/>
+      <circle cx="254" cy="152" r="13" fill="#f6d5ae"/>
+      <path d="M254 142 L254 108" stroke="#3b2a1a" stroke-width="12" fill="none"/>
+      <path d="M254 142 L254 108" stroke="#f6d5ae" stroke-width="5" fill="none"/>
+      <path d="M232 100 L222 88 M276 100 L286 88 M254 90 L254 74" stroke-width="3" fill="none"/>
+      <!-- 頸 -->
+      <path d="M130 160 L130 210 Q150 225 170 210 L170 160 Z" fill="#f6d5ae"/>
+      <!-- 耳朵與頭 -->
+      <ellipse cx="102" cy="116" rx="8" ry="13" fill="#f6d5ae"/>
+      <ellipse cx="198" cy="116" rx="8" ry="13" fill="#f6d5ae"/>
+      <ellipse cx="150" cy="108" rx="48" ry="56" fill="#f6d5ae"/>
+      <!-- 兩側頭髮 -->
+      <path d="M104 98 Q78 88 86 122 Q68 128 90 150 Q102 142 105 124 Z" fill="#f2f2f2"/>
+      <path d="M196 98 Q222 88 214 122 Q232 128 210 150 Q198 142 195 124 Z" fill="#f2f2f2"/>
+      <!-- 額頭皺紋與光澤 -->
+      <path d="M124 70 Q150 62 176 70 M130 78 Q150 72 170 78" fill="none" stroke-width="2"/>
+      <path d="M128 52 Q138 44 150 44" fill="none" stroke="#fff" stroke-width="4"/>
+      <!-- 眉眼鼻 -->
+      <path d="M118 92 Q132 82 146 92 M154 92 Q168 82 182 92" fill="none" stroke-width="6"/>
+      <circle cx="132" cy="104" r="3.5" fill="#3b2a1a"/><circle cx="168" cy="104" r="3.5" fill="#3b2a1a"/>
+      <path d="M150 106 Q140 126 153 128" fill="none" stroke-width="3"/>
+      <!-- 鬍子 -->
+      <path d="M104 126 Q98 195 150 232 Q202 195 196 126 Q186 152 150 150 Q114 152 104 126 Z" fill="#f7f7f7"/>
+      <path d="M122 144 Q136 130 150 143 Q164 130 178 144 Q164 156 150 148 Q136 156 122 144 Z" fill="#fff" stroke-width="3"/>
+      <path d="M136 175 Q150 190 164 175 M142 195 Q150 205 158 195" fill="none" stroke-width="2"/>
+      <!-- 月桂冠 -->
+      <path d="M108 70 Q150 38 192 70" fill="none" stroke="#6b7a3a" stroke-width="5"/>
+      <path d="M118 62 l-8 -8 l12 2 z M134 52 l-4 -10 l10 5 z M150 48 l0 -11 l7 8 z M168 52 l6 -9 l3 11 z M184 62 l9 -6 l-2 12 z" fill="#8fa84a" stroke-width="2"/>
+    </g>
+  </symbol>
+</svg>
+
+<!-- 古希臘羅馬房間背景 -->
+<svg class="bg" viewBox="0 0 1000 600" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#a9dcf0"/><stop offset="1" stop-color="#fbf3d4"/>
+    </linearGradient>
+    <pattern id="meander" width="40" height="24" patternUnits="userSpaceOnUse">
+      <path d="M0 20 H30 V4 H10 V14 H20" fill="none" stroke="#2d6a8f" stroke-width="3"/>
+    </pattern>
+  </defs>
+  <rect width="1000" height="600" fill="#f1dfb8"/>
+  <g filter="url(#roughSoft)" stroke="#3b2a1a" stroke-width="4" stroke-linejoin="round">
+    <rect x="-10" y="26" width="1020" height="34" fill="#fbf1d6"/>
+    <rect x="-10" y="32" width="1020" height="24" fill="url(#meander)" stroke="none"/>
+    <!-- 拱形窗 -->
+    <path d="M390 392 V190 Q390 90 500 90 Q610 90 610 190 V392 Z" fill="url(#sky)"/>
+    <path d="M392 392 V310 Q450 268 500 298 Q560 258 608 310 V392 Z" fill="#a6c48e" stroke-width="3"/>
+    <path d="M470 330 H530 V352 H470 Z M466 330 L500 306 L534 330 Z" fill="#fbf1d6" stroke-width="3"/>
+    <path d="M480 352 V330 M500 352 V330 M520 352 V330" stroke-width="2"/>
+    <circle cx="560" cy="150" r="22" fill="#ffe27a" stroke-width="3"/>
+    <rect x="376" y="392" width="248" height="16" fill="#e8d4a2"/>
+    <!-- 地板 -->
+    <path d="M0 452 H1000 V600 H0 Z" fill="#d8bf92"/>
+    <path d="M0 505 H1000 M0 560 H1000 M200 452 L90 600 M400 452 L335 600 M600 452 L665 600 M800 452 L910 600" fill="none" stroke-width="2.5"/>
+    <!-- 柱子 -->
+    <g fill="#f7f0e0">
+      <rect x="48" y="96" width="70" height="350"/>
+      <rect x="36" y="74" width="94" height="24" rx="4"/>
+      <rect x="36" y="440" width="94" height="16" rx="4"/>
+      <rect x="882" y="96" width="70" height="350"/>
+      <rect x="870" y="74" width="94" height="24" rx="4"/>
+      <rect x="870" y="440" width="94" height="16" rx="4"/>
+    </g>
+    <path d="M66 100 V440 M83 100 V440 M100 100 V440 M900 100 V440 M917 100 V440 M934 100 V440" stroke-width="2" fill="none"/>
+    <!-- 陶罐 -->
+    <path d="M190 456 Q166 410 190 384 L190 366 H214 V384 Q238 410 214 456 Z" fill="#c4572e"/>
+    <path d="M182 404 Q202 414 222 404" fill="none" stroke-width="3"/>
+    <path d="M790 456 Q770 420 790 396 L790 380 H812 V396 Q832 420 812 456 Z" fill="#b9824a"/>
+  </g>
+</svg>
+
+<!-- ================= 開場畫面 ================= -->
+<main id="intro" class="screen active">
+  <div class="intro-inner">
+    <svg class="arch-big" viewBox="0 0 300 420" role="img" aria-label="手繪的阿基米德"><use href="#archimedes"/></svg>
+    <div class="bubble">
+      <h1>👴 阿基米德說：</h1>
+      <h2>可以選用哪種工具，測量皇冠的質量呢？</h2>
+      <div class="choices">
+        <button class="btn" data-tool="balance">⚖️ 上皿天平</button>
+        <button class="btn" data-tool="spring">🌀 彈簧</button>
+        <button class="btn" data-tool="tank">💧 水缸</button>
+      </div>
+    </div>
+  </div>
+</main>
+
+<!-- ================= 實驗畫面 ================= -->
+<main id="lab" class="screen">
+  <div class="lab-wrap">
+    <div class="topbar">
+      <button class="btn small" id="backBtn">↩ 重選工具</button>
+      <div class="hint">
+        <svg viewBox="0 0 300 420"><use href="#archimedes"/></svg>
+        <span>先選一個皇冠或金塊放到左盤，再把砝碼拖到右盤，看看告示牌怎麼說！（輕點砝碼也可以直接加入；點右盤上的砝碼可以拿走）</span>
+      </div>
+    </div>
+
+    <div class="sign-wrap">
+      <div class="rope l"></div><div class="rope r"></div>
+      <div id="sign" class="sign idle">
+        <small>⚖ 天平即時檢測告示牌</small>
+        <strong id="signMain">請先選擇皇冠或金塊</strong>
+      </div>
+    </div>
+
+    <div class="stage">
+      <svg id="bal" viewBox="0 0 800 430" role="img" aria-label="上皿天平">
+        <!-- 支架 -->
+        <g filter="url(#roughSoft)" stroke="#3b2a1a" stroke-width="4" stroke-linejoin="round">
+          <path d="M255 408 Q400 384 545 408 L532 424 L268 424 Z" fill="#8b5a2b"/>
+          <path d="M386 402 L391 126 L409 126 L414 402 Z" fill="#b9824a"/>
+          <path d="M392 190 H408 M392 200 H408" stroke-width="2"/>
+        </g>
+        <!-- 刻度記號（固定） -->
+        <path d="M376 186 H424" stroke="#3b2a1a" stroke-width="3" fill="none"/>
+        <!-- 天平橫樑 -->
+        <g id="beam">
+          <path d="M146 120 Q400 104 654 120 Q400 138 146 120 Z" fill="#d6a042" stroke="#3b2a1a" stroke-width="4" stroke-linejoin="round"/>
+          <path d="M400 122 L400 182" stroke="#c4572e" stroke-width="5" stroke-linecap="round"/>
+          <circle cx="150" cy="120" r="6" fill="#fbf1d6" stroke="#3b2a1a" stroke-width="3"/>
+          <circle cx="650" cy="120" r="6" fill="#fbf1d6" stroke="#3b2a1a" stroke-width="3"/>
+        </g>
+        <circle cx="400" cy="120" r="12" fill="#fbf1d6" stroke="#3b2a1a" stroke-width="4"/>
+
+        <!-- 左盤 -->
+        <g id="panL">
+          <path d="M0 0 L-100 150 M0 0 L100 150" stroke="#3b2a1a" stroke-width="3" fill="none"/>
+          <path d="M-112 150 L112 150 Q100 188 0 192 Q-100 188 -112 150 Z" fill="#e0b85a" stroke="#3b2a1a" stroke-width="4" stroke-linejoin="round"/>
+          <g id="contL"></g>
+        </g>
+        <!-- 右盤 -->
+        <g id="panR">
+          <path d="M0 0 L-100 150 M0 0 L100 150" stroke="#3b2a1a" stroke-width="3" fill="none"/>
+          <path id="plateR" d="M-112 150 L112 150 Q100 188 0 192 Q-100 188 -112 150 Z" fill="#e0b85a" stroke="#3b2a1a" stroke-width="4" stroke-linejoin="round"/>
+          <rect id="dropR" x="-135" y="-10" width="270" height="215" fill="none" pointer-events="none"/>
+          <g id="contR"></g>
+        </g>
+      </svg>
+    </div>
+
+    <div class="panels">
+      <section class="panel">
+        <h3>① 選擇要測量的物品（放在左盤）</h3>
+        <div class="items" id="items"></div>
+      </section>
+      <section class="panel">
+        <h3>② 把砝碼拖曳到右盤（每種都有無限多個）</h3>
+        <div class="tray" id="tray"></div>
+        <button class="btn small" id="clearBtn">🧹 清空右盤砝碼</button>
+      </section>
+    </div>
+
+    <div class="bottom">
+      <button class="btn big" id="toResult">進入結果討論 ➜</button>
+    </div>
+  </div>
+</main>
+
+<!-- 提示：選錯工具 -->
+<div class="modal" id="modalThink">
+  <div class="dialog" style="text-align:center">
+    <h2>🤔 阿基米德提醒你</h2>
+    <p style="font-size:1.3rem">請再想想看，我們要測量的是<b>質量</b></p>
+    <div class="row-btn"><button class="btn" id="thinkOk">好，我再想想</button></div>
+  </div>
+</div>
+
+<!-- 結果討論：填答 -->
+<div class="modal" id="modalAnswer">
+  <div class="dialog">
+    <h2>📝 結果討論</h2>
+ <p>根據你用天平測量的結果，請填寫皇冠 A～E 和金塊的質量各是多少公克？</p>
+    <form id="ansForm" autocomplete="off" novalidate>
+      <div id="ansRows"></div>
+      <div id="feedback"></div>
+      <div class="row-btn">
+        <button type="submit" class="btn" style="background:var(--gold)">送出答案</button>
+        <button type="button" class="btn" id="ansBack">回去繼續測量</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+(function(){
+  "use strict";
+  const $ = s => document.querySelector(s);
+
+  /* ================== 資料 ================== */
+  const TARGET_MG = 193200;          // 193.2 g = 193200 mg（以整數 mg 計算避免浮點誤差）
+  const ITEMS = [
+    {id:'A', type:'crown', v:0, name:'皇冠 A'},
+    {id:'B', type:'crown', v:1, name:'皇冠 B'},
+    {id:'C', type:'crown', v:2, name:'皇冠 C'},
+    {id:'D', type:'crown', v:3, name:'皇冠 D'},
+    {id:'E', type:'crown', v:4, name:'皇冠 E'},
+    {id:'G', type:'gold',  v:0, name:'金塊'}
+  ];
+  const WEIGHTS = [
+    {id:'w100g', label:'100 g',  mg:100000, fill:'#a8844d'},
+    {id:'w50g',  label:'50 g',   mg:50000,  fill:'#b99a62'},
+    {id:'w10g',  label:'10 g',   mg:10000,  fill:'#caae78'},
+    {id:'w1g',   label:'1 g',    mg:1000,   fill:'#c3c9d0'},
+    {id:'w500mg',label:'500 mg', mg:500,     fill:'#d6dbe0'},
+    {id:'w100mg',label:'100 mg', mg:100,     fill:'#e8ebee'}
+  ];
+  const MAX_WEIGHTS = 24;
+  const JEWEL = ['#d33a3a','#2a7fd1','#2fa44f','#8a3fc7','#e87d1e'];
+
+  /* 物品圖（底部在 y=0，寬約 ±50） */
+  function itemMarkup(it){
+    const S = 'stroke="#3b2a1a" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"';
+    if(it.type === 'gold'){
+      return `<path d="M-50 0 L50 0 L38 -32 L-38 -32 Z" fill="#f5c518" ${S}/>
+              <path d="M-38 -32 L38 -32 L30 -44 L-30 -44 Z" fill="#ffe27a" ${S}/>
+              <path d="M-30 -8 L-22 -24" stroke="#fff" stroke-width="3" fill="none" stroke-linecap="round"/>
+              <text x="4" y="-9" text-anchor="middle" font-size="16" font-weight="700" fill="#3b2a1a">金塊</text>`;
+    }
+    const j = JEWEL[it.v], F = '#f2c230';
+    let body = '', gems = '';
+    switch(it.v){
+      case 0:
+        body = `<path d="M-45 0 L-50 -48 L-25 -26 L0 -62 L25 -26 L50 -48 L45 0 Z" fill="${F}" ${S}/>`;
+        gems = [[-50,-50],[0,-64],[50,-50]].map(p=>`<circle cx="${p[0]}" cy="${p[1]}" r="5" fill="${j}" ${S}/>`).join('');
+        break;
+      case 1:
+        body = `<path d="M-48 0 L-52 -45 L-30 -28 L-15 -60 L0 -30 L15 -60 L30 -28 L52 -45 L48 0 Z" fill="${F}" ${S}/>`;
+        gems = [[-52,-47],[-15,-62],[15,-62],[52,-47]].map(p=>`<circle cx="${p[0]}" cy="${p[1]}" r="4.5" fill="${j}" ${S}/>`).join('');
+        break;
+      case 2:
+        body = `<path d="M-46 0 L-46 -35 Q-46 -62 0 -66 Q46 -62 46 -35 L46 0 Z" fill="${F}" ${S}/>`;
+        gems = [[-26,-40],[0,-48],[26,-40]].map(p=>`<circle cx="${p[0]}" cy="${p[1]}" r="6" fill="${j}" ${S}/>`).join('');
+        break;
+      case 3:
+        body = `<path d="M-48 0 L-44 -34 L-26 -22 L0 -40 L26 -22 L44 -34 L48 0 Z" fill="${F}" ${S}/>`;
+        gems = [[-44,-40],[0,-46],[44,-40]].map(p=>`<circle cx="${p[0]}" cy="${p[1]}" r="7" fill="${j}" ${S}/>`).join('');
+        break;
+      default:
+        body = `<path d="M-40 0 L-40 -40 L-28 -40 L-28 -56 L-14 -56 L-14 -40 L14 -40 L14 -56 L28 -56 L28 -40 L40 -40 L40 0 Z" fill="${F}" ${S}/>`;
+        gems = [[-21,-48],[21,-48],[0,-26]].map(p=>`<circle cx="${p[0]}" cy="${p[1]}" r="4.5" fill="${j}" ${S}/>`).join('');
+    }
+    return `${body}${gems}<text x="0" y="-8" text-anchor="middle" font-size="17" font-weight="700" fill="#3b2a1a">${it.id}</text>`;
+  }
+
+  /* ================== 畫面切換 ================== */
+  function show(id){
+    document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('active', s.id===id));
+    window.scrollTo(0,0);
+  }
+  const openModal  = id => $(id).classList.add('open');
+  const closeModal = id => $(id).classList.remove('open');
+
+  document.querySelectorAll('[data-tool]').forEach(b=>{
+    b.addEventListener('click',()=>{
+      if(b.dataset.tool === 'balance') show('lab');
+      else openModal('#modalThink');
+    });
+  });
+  $('#thinkOk').onclick = ()=>closeModal('#modalThink');
+  $('#backBtn').onclick = ()=>show('intro');
+
+  /* ================== 天平狀態 ================== */
+  let cur = null;          // 目前左盤物品
+  let panW = [];           // 右盤砝碼
+  let ang = 0, vel = 0, target = 0, raf = 0;
+
+  const beam = $('#beam'), panL = $('#panL'), panR = $('#panR');
+
+  function render(){
+    const a = ang*Math.PI/180, L = 250;
+    beam.setAttribute('transform', `rotate(${-ang} 400 120)`);
+    panL.setAttribute('transform', `translate(${(400-L*Math.cos(a)).toFixed(2)} ${(120+L*Math.sin(a)).toFixed(2)})`);
+    panR.setAttribute('transform', `translate(${(400+L*Math.cos(a)).toFixed(2)} ${(120-L*Math.sin(a)).toFixed(2)})`);
+  }
+  function loop(){
+    vel += (target-ang)*0.04;
+    vel *= 0.9;
+    ang += vel;
+    render();
+    if(Math.abs(vel)>0.002 || Math.abs(target-ang)>0.01){ raf = requestAnimationFrame(loop); }
+    else { ang = target; vel = 0; render(); raf = 0; }
+  }
+  const kick = () => { if(!raf) raf = requestAnimationFrame(loop); };
+
+  function update(){
+    const left  = cur ? TARGET_MG : 0;
+    const right = panW.reduce((s,w)=>s+w.mg, 0);
+    const d = left - right;
+    const sign = $('#sign'), main = $('#signMain');
+    if(!cur && panW.length === 0){
+      sign.className = 'sign idle'; main.textContent = '請先選擇皇冠或金塊';
+    } else if(d > 0){
+      sign.className = 'sign left'; main.textContent = '⬅ 左盤較重';
+    } else if(d < 0){
+      sign.className = 'sign right'; main.textContent = '右盤較重 ➡';
+    } else {
+      sign.className = 'sign equal'; main.textContent = '⚖ 兩盤等重';
+    }
+    target = d === 0 ? 0 : Math.sign(d) * (3 + Math.min(11, Math.abs(d)/1000*0.4));
+    kick();
+  }
+
+  function renderLeft(){
+    $('#contL').innerHTML = cur ? `<g transform="translate(0,148) scale(1.4)">${itemMarkup(cur)}</g>` : '';
+    document.querySelectorAll('.item-btn').forEach(b=>b.classList.toggle('on', cur && b.dataset.id===cur.id));
+  }
+  function renderRight(){
+    const xs = [-69,-23,23,69];
+    $('#contR').innerHTML = panW.map((w,i)=>{
+      const x = xs[i%4], y = 148 - Math.floor(i/4)*28;
+      return `<g class="pw" data-i="${i}" transform="translate(${x},${y})">
+        <rect x="-8" y="-26" width="16" height="6" rx="3" fill="${w.fill}" stroke="#3b2a1a" stroke-width="2.5"/>
+        <rect x="-21" y="-22" width="42" height="22" rx="6" fill="${w.fill}" stroke="#3b2a1a" stroke-width="3"/>
+        <text x="0" y="-7" text-anchor="middle" font-size="11" font-weight="700" fill="#3b2a1a" pointer-events="none">${w.label}</text>
+      </g>`;
+    }).join('');
+  }
+
+  /* ================== 建立選單 ================== */
+  $('#items').innerHTML = ITEMS.map(it=>
+    `<button class="item-btn" data-id="${it.id}" type="button">
+       <svg viewBox="-62 -76 124 86">${itemMarkup(it)}</svg>${it.type==='gold'?'金塊':'皇冠 '+it.id}
+     </button>`).join('');
+  $('#items').addEventListener('click', e=>{
+    const b = e.target.closest('.item-btn'); if(!b) return;
+    cur = ITEMS.find(i=>i.id===b.dataset.id);
+    renderLeft(); update();
+  });
+
+  $('#tray').innerHTML = WEIGHTS.map(w=>
+    `<div class="wt" data-id="${w.id}" style="background:${w.fill}">${w.label}</div>`).join('');
+  $('#clearBtn').onclick = ()=>{ panW = []; renderRight(); update(); };
+
+  /* ================== 拖曳砝碼 ================== */
+  let drag = null;
+  function addWeight(w){
+    if(panW.length >= MAX_WEIGHTS){ toast('右盤放不下更多砝碼了'); return; }
+    panW.push(w); renderRight(); update();
+  }
+  function startDrag(e, w, fromPan){
+    e.preventDefault();
+    try{ e.target.releasePointerCapture(e.pointerId); }catch(_){}
+    const ghost = document.createElement('div');
+    ghost.className = 'wt ghost'; ghost.style.background = w.fill; ghost.textContent = w.label;
+    document.body.appendChild(ghost);
+    drag = {w, ghost, fromPan, sx:e.clientX, sy:e.clientY, moved:false};
+    place(e);
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
+  }
+  function place(e){ drag.ghost.style.left = e.clientX+'px'; drag.ghost.style.top = e.clientY+'px'; }
+  function overPan(e){
+    const r = $('#dropR').getBoundingClientRect(), m = 16;
+    return e.clientX>r.left-m && e.clientX<r.right+m && e.clientY>r.top-m && e.clientY<r.bottom+m;
+  }
+  function hot(on){ $('#plateR').setAttribute('fill', on ? '#ffd54a' : '#e0b85a'); }
+  function onMove(e){
+    if(!drag) return;
+    if(Math.hypot(e.clientX-drag.sx, e.clientY-drag.sy) > 6) drag.moved = true;
+    place(e); hot(overPan(e));
+  }
+  function onUp(e){
+    window.removeEventListener('pointermove', onMove);
+    window.removeEventListener('pointerup', onUp);
+    window.removeEventListener('pointercancel', onUp);
+    if(!drag) return;
+    const {w, moved, fromPan, ghost} = drag;
+    const over = e.type !== 'pointercancel' && overPan(e);
+    ghost.remove(); drag = null; hot(false);
+    if(fromPan && !moved) return;                 // 輕點右盤砝碼 = 拿走
+    if(over || (!moved && !fromPan)) addWeight(w); // 放進右盤／輕點加入
+  }
+  $('#tray').addEventListener('pointerdown', e=>{
+    const el = e.target.closest('.wt'); if(!el) return;
+    startDrag(e, WEIGHTS.find(w=>w.id===el.dataset.id), false);
+  });
+  $('#contR').addEventListener('pointerdown', e=>{
+    const g = e.target.closest('.pw'); if(!g) return;
+    const w = panW.splice(+g.dataset.i, 1)[0];
+    renderRight(); update();
+    startDrag(e, w, true);
+  });
+
+  /* ================== 結果討論 ================== */
+  const answerItems = ITEMS;   // 皇冠 A～E ＋ 金塊，共 6 項
+
+  $('#ansRows').innerHTML = answerItems.map(c=>
+    `<div class="ans-row" data-id="${c.id}">
+       <svg viewBox="-62 -76 124 86">${itemMarkup(c)}</svg>
+       <label for="in${c.id}">${c.name}</label>
+       <input id="in${c.id}" type="number" step="0.1" min="0" inputmode="decimal" placeholder="例如 100.0">
+       <span class="unit">g</span><span class="mark"></span>
+     </div>`).join('');
+
+  $('#toResult').onclick = ()=>{ $('#feedback').textContent=''; openModal('#modalAnswer'); };
+  $('#ansBack').onclick  = ()=>closeModal('#modalAnswer');
+  $('#ansForm').addEventListener('submit', e=>{
+    e.preventDefault();
+    let okCount = 0, empty = 0;
+    document.querySelectorAll('.ans-row').forEach(row=>{
+      const v = row.querySelector('input').value.trim();
+      const mark = row.querySelector('.mark');
+      row.classList.remove('ok','bad'); mark.textContent = '';
+      if(v === ''){ empty++; return; }
+      if(Math.abs(parseFloat(v) - TARGET_MG/1000) < 0.05){ row.classList.add('ok'); mark.textContent = '✔'; okCount++; }
+      else { row.classList.add('bad'); mark.textContent = '✘'; }
+    });
+    const fb = $('#feedback');
+    if(empty){ fb.textContent = '還有 ' + empty + ' 項沒有填寫喔！'; }
+    else if(okCount === answerItems.length){
+      fb.innerHTML = '🎉 太棒了！五頂皇冠和金塊的質量都是 <b>193.2 g</b>。<br>外形和材質不同，質量卻一樣喔！';
+    } else {
+      fb.textContent = '有些答案還不太對，回到天平再測量一次看看吧！';
+    }
+  });
+
+  /* ================== 小提示 ================== */
+  let tt;
+  function toast(msg){
+    const t = $('#toast'); t.textContent = msg; t.classList.add('show');
+    clearTimeout(tt); tt = setTimeout(()=>t.classList.remove('show'), 1800);
+  }
+
+  /* 初始化 */
+  renderLeft(); renderRight(); render(); update();
+})();
+</script>
+</body>
+</html>
